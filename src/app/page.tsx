@@ -12,14 +12,14 @@ export default function Home() {
   const [chapters, setChapters] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
 
-  const handleAudioExtracted = async (audioBlob: Blob) => {
+  const handleVideoSelected = async (videoFile: File) => {
     setStep('transcribing');
     setError(null);
 
     try {
-      // Create FormData
+      // Create FormData and send video directly
       const formData = new FormData();
-      formData.append('file', audioBlob, 'audio.mp3');
+      formData.append('file', videoFile);
 
       // Send to API
       const response = await fetch('/api/transcribe', {
@@ -110,7 +110,7 @@ export default function Home() {
         </div>
 
         {step === 'upload' && (
-          <UploadZone onAudioExtracted={handleAudioExtracted} />
+          <UploadZone onVideoSelected={handleVideoSelected} />
         )}
 
         {(step === 'transcribing' || step === 'generating') && (

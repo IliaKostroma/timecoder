@@ -2,16 +2,11 @@
 import { motion } from "framer-motion";
 import { useState, useCallback } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { useFFmpeg } from "@/hooks/use-ffmpeg";
-import { Upload, FileAudio, FileVideo, AlertCircle } from "lucide-react";
+import { Upload, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function UploadZone({ onAudioExtracted }: { onAudioExtracted: (blob: Blob) => void }) {
-    const { extractAudio, isLoading: isFfmpegLoading, loaded, progress } = useFFmpeg();
+export function UploadZone({ onVideoSelected }: { onVideoSelected: (file: File) => void }) {
     const [isDragOver, setIsDragOver] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -38,8 +33,8 @@ export function UploadZone({ onAudioExtracted }: { onAudioExtracted: (blob: Blob
             return;
         }
 
-        processFile(file);
-    }, []);
+        onVideoSelected(file);
+    }, [onVideoSelected]);
 
     const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
@@ -49,24 +44,9 @@ export function UploadZone({ onAudioExtracted }: { onAudioExtracted: (blob: Blob
                 setError("Please upload a video file.");
                 return;
             }
-            processFile(file);
+            onVideoSelected(file);
         }
-    }, []);
-
-    const processFile = async (file: File) => {
-        setIsProcessing(true);
-        try {
-            const audioBlob = await extractAudio(file);
-            if (audioBlob) {
-                onAudioExtracted(audioBlob);
-            }
-        } catch (err) {
-            console.error(err);
-            setError("Failed to extract audio. See console for details.");
-        } finally {
-            setIsProcessing(false);
-        }
-    };
+    }, [onVideoSelected]);
 
     return (
         <Card className="w-full max-w-xl mx-auto border-none shadow-xl bg-card/50 backdrop-blur-sm">
@@ -92,37 +72,22 @@ export function UploadZone({ onAudioExtracted }: { onAudioExtracted: (blob: Blob
                         onChange={handleFileSelect}
                     />
 
-                    {isProcessing ? (
-                        <div className="w-full max-w-xs space-y-4 text-center z-10">
-                            <motion.div
-                                className="w-16 h-16 rounded-full border-4 border-primary border-t-transparent mx-auto"
-                                animate={{ rotate: 360 }}
-                                transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                            />
-                            <div className="space-y-1">
-                                <p className="text-sm font-medium">Extracting Audio...</p>
-                                <p className="text-xs text-muted-foreground">{progress}% Complete</p>
-                            </div>
-                            <Progress value={progress} className="h-2 w-full" />
+                    <div className="flex flex-col items-center space-y-4 text-center p-6 z-10">
+                        <div className="p-4 rounded-full bg-background/80 shadow-sm ring-1 ring-border/50">
+                            <Upload className="w-8 h-8 text-primary/80" />
                         </div>
-                    ) : (
-                        <div className="flex flex-col items-center space-y-4 text-center p-6 z-10">
-                            <div className="p-4 rounded-full bg-background/80 shadow-sm ring-1 ring-border/50">
-                                <Upload className="w-8 h-8 text-primary/80" />
-                            </div>
-                            <div className="space-y-1">
-                                <h3 className="text-lg font-semibold tracking-tight">Upload Video File</h3>
-                                <p className="text-sm text-muted-foreground max-w-xs">
-                                    Drag and drop generic video files or click to browse.
-                                </p>
-                            </div>
-                            <div className="flex gap-2">
-                                <span className="px-2 py-1 rounded-md bg-background/50 border text-[10px] uppercase text-muted-foreground font-medium">MP4</span>
-                                <span className="px-2 py-1 rounded-md bg-background/50 border text-[10px] uppercase text-muted-foreground font-medium">MOV</span>
-                                <span className="px-2 py-1 rounded-md bg-background/50 border text-[10px] uppercase text-muted-foreground font-medium">MKV</span>
-                            </div>
+                        <div className="space-y-1">
+                            <h3 className="text-lg font-semibold tracking-tight">Upload Video File</h3>
+                            <p className="text-sm text-muted-foreground max-w-xs">
+                                Drag and drop video files or click to browse. Supports videos up to 4 hours.
+                            </p>
                         </div>
-                    )}
+                        <div className="flex gap-2">
+                            <span className="px-2 py-1 rounded-md bg-background/50 border text-[10px] uppercase text-muted-foreground font-medium">MP4</span>
+                            <span className="px-2 py-1 rounded-md bg-background/50 border text-[10px] uppercase text-muted-foreground font-medium">MOV</span>
+                            <span className="px-2 py-1 rounded-md bg-background/50 border text-[10px] uppercase text-muted-foreground font-medium">MKV</span>
+                        </div>
+                    </div>
                 </motion.div>
 
                 {error && (

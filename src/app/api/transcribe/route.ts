@@ -1,52 +1,122 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { promises as fs } from 'fs';
+import path from 'path';
+import { tmpdir } from 'os';
+import { spawn } from 'child_process';
 import Replicate from 'replicate';
+import ffmpegPath from 'ffmpeg-static';
+
+// ВАЖНО: Должен быть Node.js runtime, не Edge
+export const runtime = 'nodejs';
+
+// Путь к FFmpeg из ffmpeg-static
+const FFMPEG_PATH = ffmpegPath || 'ffmpeg';
+
+/**
+ * Конвертирует видео в лёгкий аудио-файл для Whisper
+ * mono, 16kHz, 48kbps → 4 часа ≈ 80-90 МБ
+ */
+function runFfmpeg(inputPath: string, outputPath: string): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const args = [
+      '-y',           // перезаписывать выходной файл
+      '-i', inputPath,
+      '-vn',          // без видео
+      '-ac', '1',     // mono
+      '-ar', '16000', // 16 kHz (достаточно для речи, Whisper любит)
+      '-b:a', '48k',  // 48 kbps (очень экономно)
+      '-f', 'mp3',
+      outputPath,
+    ];
+
+    const ff = spawn(FFMPEG_PATH, args);
+
+    let stderr = '';
+
+    ff.stderr.on('data', (data) => {
+      stderr += data.toString();
+      console.log('[ffmpeg]', data.toString().trim());
+    });
+
+    ff.on('error', (err) => {
+      reject(new Error(`FFmpeg spawn error: ${err.message}`));
+    });
+
+    ff.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`FFmpeg exited with code ${code}\n${stderr}`));
+      }
+    });
+  });
+}
 
 export async function POST(req: NextRequest) {
-    try {
-        const formData = await req.formData();
-        const file = formData.get('file') as Blob | null;
+  const formData = await req.formData();
+  const file = formData.get('file');
 
-        if (!file) {
-            return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+  if (!file || !(file instanceof Blob)) {
+    return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+  }
+
+  // Генерируем уникальные имена для временных файлов
+  const tmp = tmpdir();
+  const id = crypto.randomUUID();
+  const inputPath = path.join(tmp, `timecoder_${id}.input`);
+  const audioPath = path.join(tmp, `timecoder_${id}.mp3`);
+
+  try {
+    // 1) Сохраняем загруженный видеофайл на диск
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    await fs.writeFile(inputPath, buffer);
+
+    console.log(`[Transcribe] Video saved: ${inputPath} (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
+
+    // 2) Конвертируем видео → легковесный аудиофайл
+    console.log('[Transcribe] Starting FFmpeg conversion...');
+    await runFfmpeg(inputPath, audioPath);
+
+    const audioStats = await fs.stat(audioPath);
+    console.log(`[Transcribe] Audio extracted: ${audioPath} (${(audioStats.size / 1024 / 1024).toFixed(2)} MB)`);
+
+    // 3) Отправляем аудио в Whisper на Replicate
+    const audioBuffer = await fs.readFile(audioPath);
+
+    const replicate = new Replicate({
+      auth: process.env.REPLICATE_API_TOKEN,
+    });
+
+    console.log('[Transcribe] Sending to Whisper...');
+
+    const output = await replicate.run(
+      "vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
+      {
+        input: {
+          audio: audioBuffer,
+          task: "transcribe",
+          language: "None",
+          timestamp: "chunk",
+          batch_size: 64,
+          diarise_audio: false
         }
+      }
+    );
 
-        // Convert Blob to Buffer
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+    console.log('[Transcribe] Success!');
 
-        const replicate = new Replicate({
-            auth: process.env.REPLICATE_API_TOKEN,
-        });
+    return NextResponse.json({ transcript: output });
 
-        // Using incredibly-fast-whisper for 3-5x speed improvement
-        // This model is optimized for speed while maintaining good accuracy
-        const output = await replicate.run(
-            "vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c",
-            {
-                input: {
-                    audio: buffer,
-                    task: "transcribe",
-                    language: "None",
-                    timestamp: "chunk",
-                    batch_size: 64,
-                    diarise_audio: false
-                }
-            }
-        );
-
-        // We need segments to know timecodes!
-        // If output is just text, we can't generate chapters accurately based on time.
-        // Wait, the user wants CHAPTERS (Timecodes). I need timestamps.
-        // So I should request a verbose format or segments.
-        // Replicate openai/whisper usually returns a JSON object with `segments` if I don't force plain text.
-
-        // Let's assume output has segments.
-        // We will pass the full JSON output (or relevant parts) to the LLM.
-        // Or simpler: format it as "[00:00] text..." string for the LLM.
-
-        return NextResponse.json({ transcript: output });
-    } catch (error) {
-        console.error('Transcription error:', error);
-        return NextResponse.json({ error: 'Transcription failed' }, { status: 500 });
-    }
+  } catch (error: any) {
+    console.error('[Transcribe] Error:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Transcription failed' },
+      { status: 500 }
+    );
+  } finally {
+    // 4) Чистим временные файлы
+    await fs.rm(inputPath, { force: true }).catch(() => {});
+    await fs.rm(audioPath, { force: true }).catch(() => {});
+  }
 }
