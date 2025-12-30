@@ -21,14 +21,16 @@ export default function Home() {
       const formData = new FormData();
       formData.append('file', videoFile);
 
-      // Send to API
+      // Back to main endpoint with FFmpeg
       const response = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Transcription failed');
+        const errorData = await response.json().catch(() => null);
+        console.error('Server error response:', errorData);
+        throw new Error(errorData?.error || 'Transcription failed');
       }
 
       const data = await response.json();

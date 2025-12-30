@@ -2,17 +2,18 @@ import { spawn } from 'child_process';
 
 // Функция для получения пути к FFmpeg
 export function getFFmpegPath(): string {
+  // Приоритет 1: переменная окружения
   if (process.env.FFMPEG_PATH) {
     return process.env.FFMPEG_PATH;
   }
 
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const ffmpegStatic = require('ffmpeg-static');
-    return ffmpegStatic || 'ffmpeg';
-  } catch {
-    return 'ffmpeg'; // fallback к системному
-  }
+  // Приоритет 2: системный FFmpeg (всегда надежнее для production)
+  // В dev и production используем системный ffmpeg
+  return 'ffmpeg';
+
+  // Примечание: ffmpeg-static не работает с Next.js serverless из-за
+  // бандлинга путей (/ROOT/ placeholder). Используй системный FFmpeg
+  // или установи переменную окружения FFMPEG_PATH.
 }
 
 /**
