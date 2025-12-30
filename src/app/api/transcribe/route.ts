@@ -2,67 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 import { tmpdir } from 'os';
-import { spawn } from 'child_process';
 import Replicate from 'replicate';
+import { runFfmpeg, FFMPEG_PATH } from '@/lib/ffmpeg';
 
 // ВАЖНО: Должен быть Node.js runtime, не Edge
 export const runtime = 'nodejs';
 
-// Путь к FFmpeg из ffmpeg-static
-// Используем dynamic import чтобы избежать проблем с ESM/CJS
-let FFMPEG_PATH: string = 'ffmpeg';
-
-try {
-  // @ts-ignore
-  const ffmpegStatic = require('ffmpeg-static');
-  FFMPEG_PATH = ffmpegStatic || 'ffmpeg';
-  console.log('[FFmpeg] Using path:', FFMPEG_PATH);
-} catch (e) {
-  console.warn('[FFmpeg] ffmpeg-static not found, using system ffmpeg');
-}
-
-/**
- * Конвертирует видео в лёгкий аудио-файл для Whisper
- * mono, 16kHz, 48kbps → 4 часа ≈ 80-90 МБ
- */
-function runFfmpeg(inputPath: string, outputPath: string): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const args = [
-      '-y',           // перезаписывать выходной файл
-      '-i', inputPath,
-      '-vn',          // без видео
-      '-ac', '1',     // mono
-      '-ar', '16000', // 16 kHz (достаточно для речи, Whisper любит)
-      '-b:a', '48k',  // 48 kbps (очень экономно)
-      '-f', 'mp3',
-      outputPath,
-    ];
-
-    const ff = spawn(FFMPEG_PATH, args);
-
-    let stderr = '';
-
-    ff.stderr.on('data', (data) => {
-      stderr += data.toString();
-      console.log('[ffmpeg]', data.toString().trim());
-    });
-
-    ff.on('error', (err) => {
-      reject(new Error(`FFmpeg spawn error: ${err.message}`));
-    });
-
-    ff.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`FFmpeg exited with code ${code}\n${stderr}`));
-      }
-    });
-  });
-}
+console.log('[Transcribe] Module loaded, FFmpeg path:', FFMPEG_PATH);
 
 export async function POST(req: NextRequest) {
   console.log('[Transcribe] Request received');
+
+  // Проверяем наличие API токена
+  if (!process.env.REPLICATE_API_TOKEN) {
+    console.error('[Transcribe] REPLICATE_API_TOKEN not found in environment');
+    return NextResponse.json(
+      { error: 'Server misconfiguration: REPLICATE_API_TOKEN not set' },
+      { status: 500 }
+    );
+  }
 
   // Объявляем переменные для cleanup в finally
   let inputPath: string | null = null;
