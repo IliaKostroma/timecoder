@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { FFMPEG_PATH } from '@/lib/ffmpeg';
+import { tmpdir } from 'os';
+import { getFFmpegPath } from '@/lib/ffmpeg';
 
 export const runtime = 'nodejs';
 
@@ -7,11 +8,11 @@ export async function GET() {
   console.log('[Health] Check requested');
 
   const checks = {
-    ffmpeg: FFMPEG_PATH,
+    ffmpeg: getFFmpegPath(),
     replicateToken: process.env.REPLICATE_API_TOKEN ? '✓ Set' : '✗ Missing',
     nodeVersion: process.version,
     platform: process.platform,
-    tmpDir: require('os').tmpdir(),
+    tmpDir: tmpdir(),
   };
 
   console.log('[Health] Checks:', checks);

@@ -3,12 +3,10 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { tmpdir } from 'os';
 import Replicate from 'replicate';
-import { runFfmpeg, FFMPEG_PATH } from '@/lib/ffmpeg';
+import { runFfmpeg } from '@/lib/ffmpeg';
 
 // ВАЖНО: Должен быть Node.js runtime, не Edge
 export const runtime = 'nodejs';
-
-console.log('[Transcribe] Module loaded, FFmpeg path:', FFMPEG_PATH);
 
 export async function POST(req: NextRequest) {
   console.log('[Transcribe] Request received');

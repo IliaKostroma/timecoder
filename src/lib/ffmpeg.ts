@@ -1,16 +1,19 @@
 import { spawn } from 'child_process';
 
-// Путь к FFmpeg из ffmpeg-static
-// В production можно использовать системный FFmpeg
-export const FFMPEG_PATH = process.env.FFMPEG_PATH ||
-  (() => {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      return require('ffmpeg-static') as string;
-    } catch {
-      return 'ffmpeg'; // fallback к системному
-    }
-  })();
+// Функция для получения пути к FFmpeg
+export function getFFmpegPath(): string {
+  if (process.env.FFMPEG_PATH) {
+    return process.env.FFMPEG_PATH;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ffmpegStatic = require('ffmpeg-static');
+    return ffmpegStatic || 'ffmpeg';
+  } catch {
+    return 'ffmpeg'; // fallback к системному
+  }
+}
 
 /**
  * Конвертирует видео в лёгкий аудио-файл для Whisper
@@ -18,6 +21,8 @@ export const FFMPEG_PATH = process.env.FFMPEG_PATH ||
  */
 export function runFfmpeg(inputPath: string, outputPath: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    const ffmpegPath = getFFmpegPath();
+
     const args = [
       '-y',           // перезаписывать выходной файл
       '-i', inputPath,
@@ -29,9 +34,9 @@ export function runFfmpeg(inputPath: string, outputPath: string): Promise<void> 
       outputPath,
     ];
 
-    console.log('[FFmpeg] Executing:', FFMPEG_PATH, args.join(' '));
+    console.log('[FFmpeg] Executing:', ffmpegPath, args.join(' '));
 
-    const ff = spawn(FFMPEG_PATH, args);
+    const ff = spawn(ffmpegPath, args);
 
     let stderr = '';
 
