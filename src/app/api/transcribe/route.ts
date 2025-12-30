@@ -4,13 +4,22 @@ import path from 'path';
 import { tmpdir } from 'os';
 import { spawn } from 'child_process';
 import Replicate from 'replicate';
-import ffmpegPath from 'ffmpeg-static';
 
 // ВАЖНО: Должен быть Node.js runtime, не Edge
 export const runtime = 'nodejs';
 
 // Путь к FFmpeg из ffmpeg-static
-const FFMPEG_PATH = ffmpegPath || 'ffmpeg';
+// Используем dynamic import чтобы избежать проблем с ESM/CJS
+let FFMPEG_PATH: string = 'ffmpeg';
+
+try {
+  // @ts-ignore
+  const ffmpegStatic = require('ffmpeg-static');
+  FFMPEG_PATH = ffmpegStatic || 'ffmpeg';
+  console.log('[FFmpeg] Using path:', FFMPEG_PATH);
+} catch (e) {
+  console.warn('[FFmpeg] ffmpeg-static not found, using system ffmpeg');
+}
 
 /**
  * Конвертирует видео в лёгкий аудио-файл для Whisper
@@ -53,20 +62,32 @@ function runFfmpeg(inputPath: string, outputPath: string): Promise<void> {
 }
 
 export async function POST(req: NextRequest) {
-  const formData = await req.formData();
-  const file = formData.get('file');
+  console.log('[Transcribe] Request received');
 
-  if (!file || !(file instanceof Blob)) {
-    return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-  }
-
-  // Генерируем уникальные имена для временных файлов
-  const tmp = tmpdir();
-  const id = crypto.randomUUID();
-  const inputPath = path.join(tmp, `timecoder_${id}.input`);
-  const audioPath = path.join(tmp, `timecoder_${id}.mp3`);
+  // Объявляем переменные для cleanup в finally
+  let inputPath: string | null = null;
+  let audioPath: string | null = null;
 
   try {
+    const formData = await req.formData();
+    console.log('[Transcribe] FormData parsed');
+
+    const file = formData.get('file');
+    console.log('[Transcribe] File from formData:', file ? 'present' : 'missing');
+
+    if (!file || !(file instanceof Blob)) {
+      console.error('[Transcribe] No file provided or not a Blob');
+      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+
+    // Генерируем уникальные имена для временных файлов
+    const tmp = tmpdir();
+    const id = crypto.randomUUID();
+    inputPath = path.join(tmp, `timecoder_${id}.input`);
+    audioPath = path.join(tmp, `timecoder_${id}.mp3`);
+
+    console.log('[Transcribe] Temp paths:', { inputPath, audioPath });
+
     // 1) Сохраняем загруженный видеофайл на диск
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
@@ -110,13 +131,18 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('[Transcribe] Error:', error);
+    console.error('[Transcribe] Error stack:', error?.stack);
     return NextResponse.json(
       { error: error?.message || 'Transcription failed' },
       { status: 500 }
     );
   } finally {
     // 4) Чистим временные файлы
-    await fs.rm(inputPath, { force: true }).catch(() => {});
-    await fs.rm(audioPath, { force: true }).catch(() => {});
+    if (inputPath) {
+      await fs.rm(inputPath, { force: true }).catch(() => {});
+    }
+    if (audioPath) {
+      await fs.rm(audioPath, { force: true }).catch(() => {});
+    }
   }
 }
