@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
           task: "transcribe",
           language: "None",
           timestamp: "chunk",
-          batch_size: 64,
+          batch_size: 8, // Уменьшено с 64 до 8 чтобы не упираться в GPU память
           diarise_audio: false
         }
       }
