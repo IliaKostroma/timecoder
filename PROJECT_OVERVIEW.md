@@ -1,81 +1,83 @@
 # TIMECODER - YouTube Chapters Generator
 
-## Описание проекта
+## Project Description
 
-TIMECODER - это веб-приложение для автоматической генерации YouTube-глав (timestamps) из видеофайлов с использованием AI.
+TIMECODER is a web application for automatic generation of YouTube chapters (timestamps) from video files using AI.
 
-### Основная функциональность
+### Core Functionality
 
-1. **Загрузка видео** - пользователь загружает видеофайл (MP4, MOV, MKV и др.)
-2. **Извлечение аудио** - FFmpeg.wasm в браузере конвертирует видео в MP3
-3. **Транскрипция** - Whisper модель распознаёт речь и создаёт текст с временными метками
-4. **Генерация глав** - Claude 3.5 Haiku анализирует транскрипт и создаёт SEO-оптимизированные YouTube главы
-5. **Редактирование и копирование** - пользователь может отредактировать результат и скопировать в описание YouTube
+1. **Video Upload** - User uploads a video file (MP4, MOV, MKV, etc.)
+2. **Audio Extraction** - FFmpeg converts video to optimized audio file
+3. **Transcription** - Whisper model transcribes audio with timestamps
+4. **Chapter Generation** - Claude 3.5 Haiku analyzes transcript and creates SEO-optimized YouTube chapters
+5. **Edit & Copy** - User can edit results and copy to YouTube description
 
 ---
 
-## Технологический стек
+## Technology Stack
 
 ### Frontend
-- **Next.js 16.1.1** (React 19) - фреймворк с App Router
-- **TypeScript** - типизация
-- **Tailwind CSS v4** - стилизация
-- **Framer Motion** - анимации
-- **FFmpeg.wasm** - обработка видео в браузере (без отправки на сервер)
-- **Radix UI** - компоненты UI (Progress, ScrollArea, Slot)
-- **Lucide React** - иконки
+- **Next.js 16.1.1** (React 19) - Framework with App Router
+- **TypeScript** - Type safety
+- **Tailwind CSS v4** - Styling
+- **Framer Motion** - Animations
+- **Radix UI** - UI components (Progress, ScrollArea, Slot)
+- **Lucide React** - Icons
 
 ### Backend (API Routes)
-- **Next.js API Routes** - серверные эндпоинты
-- **Replicate API** - платформа для запуска AI моделей
+- **Next.js API Routes** - Server endpoints
+- **Replicate API** - Platform for running AI models
+- **ffmpeg-static** - Embedded FFmpeg binary (cross-platform)
 
-### AI Модели
+### AI Models
+
 1. **Whisper** (`vaibhavs10/incredibly-fast-whisper`)
-   - Версия: 3-5x faster Whisper
-   - Задача: транскрипция аудио с timestamps
-   - Цена: $0.000975 за секунду
+   - Version: 3-5x faster than base Whisper
+   - Task: Audio transcription with timestamps
+   - Cost: $0.000975 per second
 
 2. **Claude 3.5 Haiku** (`anthropic/claude-3.5-haiku`)
-   - Задача: генерация SEO-оптимизированных глав
-   - Input: $1 за 1M токенов
-   - Output: $5 за 1M токенов
+   - Task: Generate SEO-optimized chapters
+   - Input: $1 per 1M tokens
+   - Output: $5 per 1M tokens
 
 ---
 
-## Архитектура приложения
+## Application Architecture
 
 ```
 /src
 ├── /app
 │   ├── /api
 │   │   ├── /transcribe
-│   │   │   └── route.ts          # API: транскрипция через Whisper
+│   │   │   └── route.ts          # API: Whisper transcription
 │   │   └── /generate
-│   │       └── route.ts          # API: генерация глав через Claude
+│   │       └── route.ts          # API: Claude chapter generation
 │   ├── layout.tsx                # Root layout
-│   └── page.tsx                  # Главная страница (workflow)
+│   └── page.tsx                  # Main page (workflow)
 ├── /components
-│   ├── /ui                       # Базовые UI компоненты
-│   └── upload-zone.tsx           # Компонент загрузки видео
+│   ├── /ui                       # Base UI components
+│   └── upload-zone.tsx           # Video upload component
 ├── /hooks
-│   └── use-ffmpeg.ts             # Хук для работы с FFmpeg.wasm
+│   └── use-ffmpeg.ts             # FFmpeg hook (if needed)
 └── /lib
-    └── utils.ts                  # Утилиты (cn для className)
+    ├── utils.ts                  # Utilities (cn for className)
+    └── ffmpeg.ts                 # FFmpeg wrapper with cross-platform support
 ```
 
-### Workflow (Flow диаграмма)
+### Workflow Diagram
 
 ```
 1. UPLOAD
-   ↓ (пользователь загружает видео)
+   ↓ (user uploads video)
 2. TRANSCRIBING
-   ↓ (FFmpeg извлекает аудио → Whisper транскрибирует)
+   ↓ (FFmpeg extracts audio → Whisper transcribes)
 3. REVIEW
-   ↓ (пользователь проверяет/редактирует транскрипт)
+   ↓ (user reviews/edits transcript)
 4. GENERATING
-   ↓ (Claude генерирует главы)
+   ↓ (Claude generates chapters)
 5. DONE
-   ↓ (пользователь копирует результат)
+   ↓ (user copies result)
 ```
 
 ---
@@ -83,10 +85,16 @@ TIMECODER - это веб-приложение для автоматическо
 ## API Endpoints
 
 ### POST `/api/transcribe`
-**Описание:** Принимает аудиофайл, отправляет на Replicate Whisper, возвращает транскрипт с временными метками.
+**Description:** Accepts audio file, sends to Replicate Whisper, returns transcript with timestamps.
 
 **Input:**
-- `FormData` с полем `file` (Blob)
+- Video file uploaded via FormData
+
+**Process:**
+1. Save video to temporary file
+2. Convert video → MP3 (mono, 16kHz, 48kbps) using FFmpeg
+3. Send audio to Whisper on Replicate
+4. Clean up temporary files
 
 **Output:**
 ```json
@@ -102,13 +110,13 @@ TIMECODER - это веб-приложение для автоматическо
 }
 ```
 
-**Обработка на клиенте:**
-- Форматирует в строку вида: `[0:00] Hello world\n[0:05] Next sentence...`
+**Client Processing:**
+- Formats to string: `[0:00] Hello world\n[0:05] Next sentence...`
 
 ---
 
 ### POST `/api/generate`
-**Описание:** Принимает транскрипт, отправляет на Claude 3.5 Haiku, возвращает YouTube главы.
+**Description:** Accepts transcript, sends to Claude 3.5 Haiku, returns YouTube chapters.
 
 **Input:**
 ```json
@@ -125,172 +133,182 @@ TIMECODER - это веб-приложение для автоматическо
 ```
 
 **System Prompt:**
-- Строгие правила форматирования (MM:SS с leading zeros)
-- SEO-оптимизация названий глав
-- Использование action verbs
-- 5-8 глав на видео
+- Strict formatting rules (MM:SS with leading zeros)
+- SEO-optimized chapter titles
+- Action verbs usage
+- 5-8 chapters per video
 
 ---
 
-## Ограничения и производительность
+## Limitations and Performance
 
-### Максимальная длина видео
-- **Оптимально:** до 1 часа
-- **Технически возможно:** до 2-3 часов
-- **Ограничения:**
-  - FFmpeg.wasm работает в памяти браузера (2-4GB обычно)
-  - Whisper может выдать OOM на очень длинных файлах
-  - Claude context window: 200K токенов ≈ 2-3 часа транскрипта
+### Maximum Video Length
+- **Optimal:** up to 1 hour
+- **Technically possible:** up to 2-3 hours
+- **Limitations:**
+  - Whisper may produce OOM on very long files (batch_size reduced to 8)
+  - Claude context window: 200K tokens ≈ 2-3 hours of transcript
+  - Upload file size limited by Next.js settings (default ~50MB for body)
 
-### Стоимость обработки
+### Processing Cost
 
-| Длительность | Whisper | Claude Haiku | **ИТОГО** |
-|--------------|---------|--------------|-----------|
-| 1 минута     | $0.059  | ~$0.001      | **$0.06** |
-| 10 минут     | $0.59   | ~$0.004      | **$0.59** |
-| 1 час        | $3.51   | ~$0.02       | **$3.53** |
+| Duration | Whisper | Claude Haiku | **TOTAL** |
+|----------|---------|--------------|-----------|
+| 1 minute | $0.059  | ~$0.001      | **$0.06** |
+| 10 minutes | $0.59 | ~$0.004      | **$0.59** |
+| 1 hour   | $3.51   | ~$0.02       | **$3.53** |
 
-*95% стоимости - Whisper, Claude добавляет копейки*
+*95% of cost is Whisper, Claude adds pennies*
 
 ---
 
-## Установка и запуск
+## Installation and Setup
 
-### Требования
+### Requirements
 - Node.js 20+
-- npm или yarn
+- npm or yarn
 - Replicate API Token
 
-### Шаги установки
+### Installation Steps
 
-1. **Клонируйте репозиторий**
+1. **Clone the repository**
 ```bash
-cd /path/to/TIMECODER
+git clone <your-repo-url>
+cd TIMECODER
 ```
 
-2. **Установите зависимости**
+2. **Install dependencies**
 ```bash
 npm install
 ```
 
-3. **Настройте переменные окружения**
-Создайте `.env.local`:
+3. **Configure environment variables**
+
+Create `.env.local`:
+```bash
+cp .env.example .env.local
+```
+
+Get your Replicate API token at [replicate.com/account/api-tokens](https://replicate.com/account/api-tokens)
+
+Edit `.env.local`:
 ```env
 REPLICATE_API_TOKEN=your_token_here
 ```
 
-4. **Запустите сервер**
+4. **Run the server**
 
-**Вариант 1: Двойной клик**
-- Запустите `start.command` (macOS)
-
-**Вариант 2: npm**
+**Option 1: npm**
 ```bash
 npm run dev
 ```
 
-**Вариант 3: Автоматический скрипт**
+**Option 2: Automated script (macOS)**
 ```bash
 ./start.command
 ```
-Скрипт автоматически:
-- Проверит и освободит порты 3000/3001
-- Установит зависимости
-- Запустит dev сервер
+Script automatically:
+- Checks and frees ports 3000/3001
+- Installs dependencies
+- Starts dev server
 
-5. **Откройте браузер**
+5. **Open browser**
 ```
 http://localhost:3000
 ```
 
 ---
 
-## Особенности реализации
+## Implementation Details
 
-### 1. FFmpeg в браузере
-- Используется `@ffmpeg/ffmpeg` (WebAssembly версия)
-- Обработка видео происходит локально (не загружается на сервер)
-- Требуются специальные CORS заголовки в `next.config.ts`:
-  ```ts
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
-  ```
+### 1. FFmpeg on Server
+- Uses `ffmpeg-static` (embedded binary, works on all platforms)
+- Video processing happens server-side (not in browser)
+- Fallback to system FFmpeg if available
+- Out-of-the-box Windows/macOS/Linux support
+- Priority order:
+  1. `FFMPEG_PATH` environment variable
+  2. System FFmpeg (if in PATH)
+  3. ffmpeg-static (embedded binary)
 
-### 2. Replicate API
-- Whisper возвращает объект с `chunks` (массив сегментов с timestamps)
-- Claude возвращает массив строк (streaming), склеивается через `.join('')`
+### 2. Audio Optimization
+- Converts to mono, 16kHz, 48kbps MP3
+- 4 hours of video ≈ 80-90 MB audio
+- Optimized for Whisper model requirements
 
-### 3. Обработка ошибок
-- На сервере логируются детали ошибок
-- На клиенте показываются понятные сообщения
-- Ошибка 400 если нет транскрипта в `/api/generate`
+### 3. Replicate API
+- Whisper returns object with `chunks` (array of segments with timestamps)
+- Claude returns array of strings (streaming), joined via `.join('')`
+- Batch size set to 8 to avoid GPU memory issues
 
-### 4. UX/UI
-- Drag & drop загрузка
-- Анимации через Framer Motion
-- Прогресс-бар при обработке
-- Gradient mesh фон
-- Редактируемые textarea для транскрипта и глав
+### 4. Error Handling
+- Server logs detailed error information
+- Client displays user-friendly messages
+- 400 error if no transcript in `/api/generate`
+
+### 5. UX/UI
+- Drag & drop upload
+- Framer Motion animations
+- Progress bar during processing
+- Gradient mesh background
+- Editable textareas for transcript and chapters
 
 ---
 
-## Известные проблемы и решения
+## Known Issues and Solutions
 
-### Проблема 1: Claude не создаёт задачу на Replicate
-**Причина:** Использовался неподдерживаемый параметр `temperature`
+### Issue 1: Claude doesn't create task on Replicate
+**Cause:** Unsupported `temperature` parameter was used
 
-**Решение:** Удалён параметр из запроса (исправлено в `src/app/api/generate/route.ts:76`)
+**Solution:** Removed parameter from request (fixed in `src/app/api/generate/route.ts:76`)
 
-Модель `anthropic/claude-3.5-haiku` на Replicate принимает только:
+Model `anthropic/claude-3.5-haiku` on Replicate accepts only:
 - `prompt` (required)
 - `system_prompt` (optional)
 - `max_tokens` (optional)
 
-### Проблема 2: Порт 3000 занят при запуске
-**Решение:** Используйте `start.command` - автоматически убивает процессы на занятых портах
+### Issue 2: Port 3000 busy on startup
+**Solution:** Use `start.command` - automatically kills processes on occupied ports
+
+### Issue 3: FFmpeg not found on Windows
+**Solution:** Now uses `ffmpeg-static` package with automatic fallback (fixed in `src/lib/ffmpeg.ts`)
 
 ---
 
-## Потенциальные улучшения
+## Potential Improvements
 
-### Функциональные
-- [ ] Поддержка URL видео (YouTube, Vimeo) вместо загрузки файла
-- [ ] Экспорт в разные форматы (JSON, SRT, VTT)
-- [ ] Поддержка нескольких языков
-- [ ] Автоматическое определение языка
-- [ ] Batch processing (загрузка нескольких видео)
-- [ ] История обработанных видео (LocalStorage или БД)
+### Features
+- [ ] Support video URLs (YouTube, Vimeo) instead of file upload
+- [ ] Export to different formats (JSON, SRT, VTT)
+- [ ] Multi-language support
+- [ ] Automatic language detection
+- [ ] Batch processing (multiple videos)
+- [ ] Processing history (LocalStorage or DB)
 
-### Технические
-- [ ] Добавить rate limiting
-- [ ] Кеширование результатов
-- [ ] Прогресс-бар для Replicate задач (polling status)
-- [ ] Server-Sent Events для real-time обновлений
-- [ ] Загрузка больших файлов через chunked upload
-- [ ] Деплой на Vercel/Railway
-- [ ] Docker контейнеризация
+### Technical
+- [ ] Add rate limiting
+- [ ] Result caching
+- [ ] Progress bar for Replicate tasks (polling status)
+- [ ] Server-Sent Events for real-time updates
+- [ ] Chunked upload for large files
+- [ ] Deploy to Vercel/Railway
+- [ ] Docker containerization
 
 ### UI/UX
-- [ ] Темная/светлая тема
-- [ ] Предпросмотр видео
-- [ ] Rich text editor для глав
-- [ ] Шаблоны стилей глав (формальный, casual, technical)
-- [ ] Экспорт в PDF с оформлением
+- [ ] Dark/light theme toggle
+- [ ] Video preview
+- [ ] Rich text editor for chapters
+- [ ] Chapter style templates (formal, casual, technical)
+- [ ] Export to styled PDF
 
 ---
 
-## Зависимости
+## Dependencies
 
 ### Production
 ```json
 {
-  "@ffmpeg/ffmpeg": "^0.12.15",
-  "@ffmpeg/util": "^0.12.2",
-  "@radix-ui/react-progress": "^1.1.8",
-  "@radix-ui/react-scroll-area": "^1.2.10",
-  "@radix-ui/react-slot": "^1.2.4",
-  "class-variance-authority": "^0.7.1",
-  "clsx": "^2.1.1",
+  "ffmpeg-static": "^5.3.0",
   "framer-motion": "^12.23.26",
   "lucide-react": "^0.562.0",
   "next": "16.1.1",
@@ -308,7 +326,6 @@ http://localhost:3000
   "@types/node": "^20",
   "@types/react": "^19",
   "@types/react-dom": "^19",
-  "babel-plugin-react-compiler": "1.0.0",
   "eslint": "^9",
   "eslint-config-next": "16.1.1",
   "tailwindcss": "^4",
@@ -318,7 +335,7 @@ http://localhost:3000
 
 ---
 
-## Файловая структура проекта
+## Project Structure
 
 ```
 TIMECODER/
@@ -337,39 +354,49 @@ TIMECODER/
 │   │   │   ├── progress.tsx
 │   │   │   └── textarea.tsx
 │   │   └── upload-zone.tsx          # Drag & drop component
-│   ├── hooks/
-│   │   └── use-ffmpeg.ts            # FFmpeg hook
 │   └── lib/
-│       └── utils.ts
-├── .env.local                        # API keys (не коммитить!)
+│       ├── utils.ts
+│       └── ffmpeg.ts                # FFmpeg wrapper
+├── .env.local                        # API keys (DO NOT COMMIT!)
+├── .env.example                      # Template for API keys
+├── .gitignore                        # Git ignore rules
 ├── .next/                            # Build artifacts
 ├── node_modules/
 ├── package.json
-├── next.config.ts                    # Next.js config + CORS
+├── next.config.ts                    # Next.js config
 ├── tailwind.config.ts
 ├── tsconfig.json
-├── start.command                     # Startup script
-└── PROJECT_OVERVIEW.md              # Этот файл
+├── start.command                     # Startup script (macOS)
+├── README.md                         # Quick start guide
+└── PROJECT_OVERVIEW.md              # This file
 ```
 
 ---
 
-## Лицензия и использование
+## Security Notes
 
-Проект создан для генерации YouTube глав. Может использоваться как основа для других проектов обработки видео/аудио с AI.
+### Environment Variables
+- **Never commit `.env.local`** with real API keys
+- `.env*` is already in `.gitignore`
+- Use `.env.example` as template
 
-### Важные замечания:
-- Требуется Replicate API ключ (платный сервис)
-- FFmpeg работает в браузере - не требует серверной обработки
-- Все данные обрабатываются приватно (видео не загружается на сторонние серверы, кроме Replicate для AI)
+### If Keys Were Accidentally Committed
+1. Immediately revoke keys on Replicate
+2. Create new keys
+3. Use `git filter-branch` or BFG Repo-Cleaner to remove from history
 
 ---
 
-## Контакты и поддержка
+## License
 
-Для обсуждения с другими AI или разработчиками:
-- Репозиторий: `/Users/ilakostroma/Documents/TIMECODER`
-- Главный файл: `src/app/page.tsx`
-- API роуты: `src/app/api/*/route.ts`
+MIT
 
-**Дата последнего обновления:** 30 декабря 2025
+---
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+---
+
+**Last updated:** January 2026
