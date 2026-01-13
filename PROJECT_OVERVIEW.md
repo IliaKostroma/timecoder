@@ -1,3 +1,4 @@
+
 # TIMECODER - YouTube Chapters Generator
 
 ## Project Description
@@ -152,13 +153,12 @@ TIMECODER is a web application for automatic generation of YouTube chapters (tim
 
 ### Processing Cost
 
-| Duration | Whisper | Claude Haiku | **TOTAL** |
-|----------|---------|--------------|-----------|
-| 1 minute | $0.059  | ~$0.001      | **$0.06** |
-| 10 minutes | $0.59 | ~$0.004      | **$0.59** |
-| 1 hour   | $3.51   | ~$0.02       | **$3.53** |
+| Duration | Processing Time | Cost |
+|----------|----------------|------|
+| 10 minutes | ~7 seconds | ~$0.007 (< 1 cent) |
+| 1 hour | ~40 seconds | ~$0.04 (4 cents) |
 
-*95% of cost is Whisper, Claude adds pennies*
+*Extremely cost-effective with incredibly-fast-whisper model*
 
 ---
 
